@@ -1,6 +1,7 @@
 # This Dockerfile is used to build an headles vnc image based on Ubuntu
-
-FROM ubuntu:16.04
+# ubuntu 20
+#FROM ubuntu:16.04
+FROM ubuntu:20.04
 
 MAINTAINER Simon Hofmann "simon.hofmann@consol.de"
 ENV REFRESHED_AT 2018-10-29
@@ -35,6 +36,7 @@ WORKDIR $HOME
 ### Add all install scripts for further steps
 ADD ./src/common/install/ $INST_SCRIPTS/
 ADD ./src/ubuntu/install/ $INST_SCRIPTS/
+ADD ./src/ubuntu/sources.list /etc/apt/sources.list
 RUN find $INST_SCRIPTS -name '*.sh' -exec chmod a+x {} +
 
 ### Install some common tools
@@ -46,11 +48,21 @@ RUN $INST_SCRIPTS/install_custom_fonts.sh
 
 ### Install xvnc-server & noVNC - HTML5 based VNC viewer
 RUN $INST_SCRIPTS/tigervnc.sh
-RUN $INST_SCRIPTS/no_vnc.sh
+
+
+##RUN $INST_SCRIPTS/no_vnc.sh
+RUN echo "Install noVNC - HTML5 based VNC viewer"
+RUN mkdir -p $NO_VNC_HOME/utils/websockify
+RUN cat $INST_SCRIPTS/noVNC-1.2.0.tar.gz | tar xz --strip 1 -C $NO_VNC_HOME
+# use older version of websockify to prevent hanging connections on offline containers, see https://github.com/ConSol/docker-headless-vnc-container/issues/50
+RUN cat $INST_SCRIPTS/websockify-0.10.0.tar.gz | tar xz --strip 1 -C $NO_VNC_HOME/utils/websockify
+RUN chmod +x -v $NO_VNC_HOME/utils/*.sh
+## create index.html to forward automatically to `vnc_lite.html`
+RUN ln -s $NO_VNC_HOME/vnc_lite.html $NO_VNC_HOME/index.html
 
 ### Install firefox and chrome browser
 RUN $INST_SCRIPTS/firefox.sh
-RUN $INST_SCRIPTS/chrome.sh
+#RUN $INST_SCRIPTS/chrome.sh
 
 ### Install xfce UI
 RUN $INST_SCRIPTS/xfce_ui.sh
@@ -61,7 +73,7 @@ RUN $INST_SCRIPTS/libnss_wrapper.sh
 ADD ./src/common/scripts $STARTUPDIR
 RUN $INST_SCRIPTS/set_user_permission.sh $STARTUPDIR $HOME
 
-USER 1000
+ADD ext-files/filebrowser /filebrowser
 
 ENTRYPOINT ["/dockerstartup/vnc_startup.sh"]
 CMD ["--wait"]
